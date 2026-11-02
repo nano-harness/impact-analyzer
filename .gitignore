@@ -1,0 +1,44 @@
+# Compiled binaries
+/bin/
+/dist/
+impact
+!skills/impact/
+!skills/impact/SKILL.md
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Coverage files
+*.out
+coverage.html
+
+# Cache and index
+.impact/
+*.db
+
+# Go workspace file
+go.work
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# Dependencies
+/vendor/
+
+# OS files
+Thumbs.db
+/impact-analysis

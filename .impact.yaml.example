@@ -1,0 +1,110 @@
+# Impact Configuration File
+
+# ============================================
+# Simplified Format (Recommended)
+# ============================================
+# Use this format to quickly get started with sensible defaults
+
+# Main language (optional, but recommended for better defaults)
+language: go
+
+# Paths to exclude from analysis (supports glob patterns with **)
+exclude:
+  - "**/*_test.go"
+  - "vendor/**"
+  - "tools/**"
+  - "e2e/dynsmoke/**"
+  - "pages/**"
+
+# Analysis settings
+analyze:
+  depth: 5  # Maximum traversal depth (default: 5, use -1 for unlimited)
+
+# ============================================
+# Detailed Format (Advanced Configuration)
+# ============================================
+# The simplified format above is merged with the detailed format below
+# Use detailed format for fine-grained control
+
+# Go language settings
+go:
+  use_deep_analysis: true  # Enable go/types + callgraph analysis
+  test_patterns:
+    - "*_test.go"
+  build_tags: []
+
+# Java language settings
+java:
+  test_patterns:
+    - "*Test.java"
+    - "*Tests.java"
+  source_dirs:
+    - "src/main/java"
+    - "src/test/java"
+
+# JavaScript language settings
+javascript:
+  test_patterns:
+    - "*.test.js"
+    - "*.spec.js"
+    - "**/__tests__/**/*.js"
+
+# TypeScript language settings
+typescript:
+  test_patterns:
+    - "*.test.ts"
+    - "*.spec.ts"
+    - "**/__tests__/**/*.ts"
+  config_file: "tsconfig.json"
+
+# Indexing settings
+index:
+  cache_dir: ".impact/cache"
+  ignore_patterns:
+    - "node_modules"
+    - "vendor"
+    - ".git"
+    - "dist"
+    - "build"
+    - "target"
+  incremental_mode: true
+
+# Analysis settings (detailed)
+analysis:
+  max_depth: 5  # -1 for unlimited (can also be set via analyze.depth above)
+  include_tests: true
+  include_vendor: false
+  track_unresolved: true  # Track unresolved dynamic calls in JS/TS
+  exclude_paths:  # Additional exclude paths (merged with top-level exclude)
+    - "generated/**"
+    - "*.pb.go"
+
+# Risk classification settings
+risk:
+  breaking_threshold: 75.0  # Score >= 75 = breaking
+  warning_threshold: 30.0   # Score >= 30 = warning, < 30 = safe
+
+  # Weight factors for composite risk scoring (sum = 1.0)
+  caller_weight: 0.4      # Impact of caller count
+  export_weight: 0.3      # Impact of export visibility
+  interface_weight: 0.3   # Impact of interface implementations
+
+# Orphan detection settings
+orphan:
+  # Go-only type reference edges reduce orphan false positives for structs/interfaces.
+  # Set to false to restore legacy call-only reachability.
+  type_ref_edges: true
+  # Symbols with at least this many callers are demoted from high to medium confidence.
+  high_gate_min_callers: 5
+  # Default noise filters can be disabled to restore legacy, unfiltered output.
+  # Noise filters are soft penalties for confidence scoring, not hard skips.
+  noise_filter:
+    skip_local_variables: true
+    skip_unexported_constants: true
+    skip_tiny_structs: true
+    skip_short_functions: true
+  confidence:
+    local_variable_penalty: -0.8
+    unexported_const_penalty: -0.6
+    tiny_struct_penalty: -0.5
+    short_function_penalty: -0.4

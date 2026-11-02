@@ -1,0 +1,166 @@
+{
+  "affected_files": [],
+  "affected_packages": [],
+  "affected_tests": [],
+  "breaking_count": 0,
+  "changes": [
+    {
+      "affected_tests": null,
+      "all_callers": [
+        {
+          "column": 6,
+          "end_line": 7,
+          "file": "main.go",
+          "is_exported": false,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 5,
+          "name": "main",
+          "package": "main"
+        }
+      ],
+      "change": {
+        "body_changed": true,
+        "comment_only": false,
+        "end_line": 8,
+        "file": "greeter/greeter.go",
+        "old_symbol": {
+          "column": 6,
+          "end_line": 8,
+          "file": "greeter/greeter.go",
+          "is_exported": true,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 6,
+          "name": "Greet",
+          "package": "greeter"
+        },
+        "signature_changed": false,
+        "start_line": 6,
+        "symbol": {
+          "column": 6,
+          "end_line": 8,
+          "file": "greeter/greeter.go",
+          "is_exported": true,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 6,
+          "name": "Greet",
+          "package": "greeter"
+        },
+        "type": "modified"
+      },
+      "cross_package_callers": 0,
+      "direct_callers": [
+        {
+          "column": 6,
+          "end_line": 7,
+          "file": "main.go",
+          "is_exported": false,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 5,
+          "name": "main",
+          "package": "main"
+        }
+      ],
+      "exported_callers_count": 0,
+      "internal_callers_count": 0,
+      "reach": 1,
+      "risk_level": "warning",
+      "risk_score": 35
+    },
+    {
+      "affected_tests": null,
+      "all_callers": [
+        {
+          "column": 6,
+          "end_line": 8,
+          "file": "greeter/greeter.go",
+          "is_exported": true,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 6,
+          "name": "Greet",
+          "package": "greeter"
+        },
+        {
+          "column": 6,
+          "end_line": 7,
+          "file": "main.go",
+          "is_exported": false,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 5,
+          "name": "main",
+          "package": "main"
+        }
+      ],
+      "change": {
+        "body_changed": true,
+        "comment_only": false,
+        "end_line": 12,
+        "file": "greeter/greeter.go",
+        "old_symbol": {
+          "column": 6,
+          "end_line": 12,
+          "file": "greeter/greeter.go",
+          "is_exported": false,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 10,
+          "name": "message",
+          "package": "greeter"
+        },
+        "signature_changed": true,
+        "start_line": 10,
+        "symbol": {
+          "column": 6,
+          "end_line": 12,
+          "file": "greeter/greeter.go",
+          "is_exported": false,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 10,
+          "name": "message",
+          "package": "greeter"
+        },
+        "type": "modified"
+      },
+      "cross_package_callers": 0,
+      "direct_callers": [
+        {
+          "column": 6,
+          "end_line": 8,
+          "file": "greeter/greeter.go",
+          "is_exported": true,
+          "is_test": false,
+          "kind": "function",
+          "language": "go",
+          "line": 6,
+          "name": "Greet",
+          "package": "greeter"
+        }
+      ],
+      "exported_callers_count": 0,
+      "internal_callers_count": 0,
+      "reach": 2,
+      "risk_level": "warning",
+      "risk_score": 50
+    }
+  ],
+  "language_breakdown": {},
+  "safe_count": 0,
+  "schema_version": "1.0",
+  "total_callers": 0,
+  "total_reach": 3,
+  "warning_count": 2
+}

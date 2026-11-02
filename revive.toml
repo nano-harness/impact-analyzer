@@ -1,0 +1,75 @@
+ignoreGeneratedHeader = false
+severity = "warning"
+confidence = 0.8
+errorCode = 1
+warningCode = 0
+
+# Disable overly strict rules for now
+[rule.package-comments]
+  disabled = true
+
+[rule.exported]
+  disabled = true
+
+[rule.var-naming]
+  disabled = true
+
+[rule.indent-error-flow]
+  disabled = false
+
+[rule.blank-imports]
+  disabled = true
+
+[rule.context-as-argument]
+  disabled = false
+
+[rule.dot-imports]
+  disabled = false
+
+[rule.error-return]
+  disabled = false
+
+[rule.error-strings]
+  disabled = false
+
+[rule.error-naming]
+  disabled = false
+
+[rule.if-return]
+  disabled = false
+
+[rule.increment-decrement]
+  disabled = false
+
+[rule.var-declaration]
+  disabled = false
+
+[rule.range]
+  disabled = false
+
+[rule.receiver-naming]
+  disabled = false
+
+[rule.time-naming]
+  disabled = false
+
+[rule.unexported-return]
+  disabled = false
+
+[rule.errorf]
+  disabled = false
+
+[rule.empty-block]
+  disabled = false
+
+[rule.superfluous-else]
+  disabled = false
+
+[rule.unused-parameter]
+  disabled = true
+
+[rule.unreachable-code]
+  disabled = false
+
+[rule.redefines-builtin-id]
+  disabled = false

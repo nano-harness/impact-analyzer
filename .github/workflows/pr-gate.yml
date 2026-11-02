@@ -1,0 +1,72 @@
+name: PR Gate
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-1.25-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-1.25-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run go fmt
+        run: |
+          if [ -n "$(gofmt -s -l .)" ]; then
+            echo "Go code is not formatted:"
+            gofmt -s -d .
+            echo "Please run: gofmt -s -w ."
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests with race detector
+        run: go test -v -race ./...
+
+      - name: Run tests with coverage
+        run: |
+          go test -v -coverprofile=coverage.out ./... 2>&1 | tee test_output.log
+          if grep -q "FAIL" test_output.log; then
+            exit 1
+          fi
+
+      - name: Check test coverage
+        run: |
+          total_coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${total_coverage}%"
+          # Warn if coverage is below 50%, but don't fail
+          if (( $(echo "$total_coverage < 50" | bc -l) )); then
+            echo "::warning::Test coverage is below 50% (${total_coverage}%)"
+          fi
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Build CLI binary
+        run: go build -o impact -ldflags="-X main.version=pr-${{ github.event.pull_request.number }}" .
+
+      - name: Verify CLI works
+        run: |
+          ./impact version
+          ./impact doctor || true  # doctor may fail in CI, that's OK
