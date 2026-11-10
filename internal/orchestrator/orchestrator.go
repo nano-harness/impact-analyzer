@@ -643,6 +643,11 @@ func (o *Orchestrator) buildGoDeepAnalysis(files []string) error {
 		}
 	}
 	repoPrefix := absRepo + string(os.PathSeparator)
+	keepCallFile := func(file string) bool {
+		return strings.HasPrefix(o.absolutePath(file), repoPrefix)
+	}
+	// Both values affect the predicate for relative call-site filenames.
+	filterScope := o.repoPath + "\x00" + repoPrefix
 
 	// Process each package directory
 	for _, dir := range dirs {
@@ -652,7 +657,7 @@ func (o *Orchestrator) buildGoDeepAnalysis(files []string) error {
 		var calls []*model.CallSite
 		var err error
 		if hasSession && session.CoversDir(dir) {
-			calls, err = o.goDeepCache.callSitesForDir(session, dir, buildTags, nil)
+			calls, err = o.goDeepCache.callSitesForDirFiltered(session, dir, buildTags, nil, filterScope, keepCallFile)
 		} else {
 			calls, err = o.goDeepCache.buildPackageCallGraph(deepAnalyzer, dir, buildTags, nil)
 		}

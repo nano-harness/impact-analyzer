@@ -569,8 +569,9 @@ func (a *GoAdapter) BuildPackageCallGraph(pkgDir string, buildTags, customEntryP
 			continue
 		}
 
-		caller := a.ssaFunctionToSymbol(analyzer, node.Func)
-		if caller == nil {
+		// Only caller eligibility is needed; its source metadata is discarded.
+		caller := godeep.SourceFunction(node.Func)
+		if caller == nil || caller.Pkg == nil {
 			continue
 		}
 

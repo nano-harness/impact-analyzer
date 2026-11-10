@@ -122,6 +122,8 @@ func (a *Analyzer) BuildSSA() (err error) {
 	return nil
 }
 
+// analyzeRTA converts RTA failures into an error so callers can fall back to
+// shallower analysis. It does not change the parallel SSA construction mode.
 func analyzeRTA(roots []*ssa.Function) (result *rta.Result, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -187,6 +189,10 @@ func (a *Analyzer) BuildCallGraph(customEntryPoints ...string) (*callgraph.Graph
 	result, err := analyzeRTA(roots)
 	if err != nil {
 		return nil, err
+	}
+	if result == nil {
+		// Successful graph consumers expect a non-nil graph, even without roots.
+		return &callgraph.Graph{Nodes: make(map[*ssa.Function]*callgraph.Node)}, nil
 	}
 	return result.CallGraph, nil
 }

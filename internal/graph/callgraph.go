@@ -95,8 +95,10 @@ func (cg *CallGraph) AddSymbol(symbol *model.Symbol) {
 	}
 	// A package-enriched call reference is not a declaration. Do not let
 	// its missing source metadata replace an already registered definition.
-	if existing := cg.symbols[symbol.QualifiedName()]; existing != nil && existing.File != "" && symbol.File == "" {
-		return
+	if symbol.File == "" {
+		if existing := cg.symbols[symbol.QualifiedName()]; existing != nil && existing.File != "" {
+			return
+		}
 	}
 	cg.finalized = false
 	cg.symbols[symbol.QualifiedName()] = symbol

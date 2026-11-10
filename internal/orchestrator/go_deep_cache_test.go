@@ -106,3 +106,40 @@ func TestGoDeepCallCache_Clear(t *testing.T) {
 		t.Fatalf("expected rebuild after Clear, got %d builds", n)
 	}
 }
+
+func TestGoDeepCallCache_FilterScopeIsolation(t *testing.T) {
+	cache := newGoDeepCallCache()
+	counts := make(map[string]int)
+	scopes := []struct {
+		filtered bool
+		scope    string
+		label    string
+	}{
+		{false, "", "full"}, {true, "", "filtered-empty"}, {true, "/repo-a", "scope-a"}, {true, "/repo-b", "scope-b"},
+	}
+	for pass := 0; pass < 2; pass++ {
+		for _, scope := range scopes {
+			got, err := cache.getScoped("/repo/pkg", nil, nil, scope.filtered, scope.scope, func() ([]*model.CallSite, error) {
+				counts[scope.label]++
+				return []*model.CallSite{{File: scope.label}}, nil
+			})
+			if err != nil || len(got) != 1 || got[0].File != scope.label {
+				t.Fatalf("scope %s contaminated: %v %v", scope.label, got, err)
+			}
+		}
+	}
+	for label, count := range counts {
+		if count != 1 {
+			t.Fatalf("%s built %d times", label, count)
+		}
+	}
+	// The pre-existing full-cache API must hit the full entry, not any filter.
+	got, err := cache.get("/repo/pkg", nil, nil, func() ([]*model.CallSite, error) { t.Fatal("full entry not reused"); return nil, nil })
+	if err != nil || got[0].File != "full" {
+		t.Fatal("full API contaminated")
+	}
+	cache.Clear()
+	if len(cache.entries) != 0 {
+		t.Fatal("Clear retained scoped entries")
+	}
+}

@@ -29,6 +29,8 @@ type goDeepCallCache struct {
 }
 
 type goDeepCallKey struct {
+	filtered    bool
+	scope       string
 	dir         string
 	buildTags   string
 	entryPoints string
@@ -60,10 +62,25 @@ func (c *goDeepCallCache) callSitesForDir(session *godeep.Session, dir string, b
 	})
 }
 
+// callSitesForDirFiltered keeps filtered results separate from full results and
+// other scopes. The caller must choose a scope identifying the predicate's
+// semantics, including its root; function pointer identity is not sufficient.
+func (c *goDeepCallCache) callSitesForDirFiltered(session *godeep.Session, dir string, buildTags, entryPoints []string, scope string, keep func(string) bool) ([]*model.CallSite, error) {
+	return c.getScoped(dir, buildTags, entryPoints, true, scope, func() ([]*model.CallSite, error) {
+		return session.CallSitesForDirFiltered(dir, keep, entryPoints...)
+	})
+}
+
 // get memoizes a per-directory call-site build under the (dir, buildTags,
 // entryPoints) key.
 func (c *goDeepCallCache) get(dir string, buildTags, entryPoints []string, build func() ([]*model.CallSite, error)) ([]*model.CallSite, error) {
+	return c.getScoped(dir, buildTags, entryPoints, false, "", build)
+}
+
+func (c *goDeepCallCache) getScoped(dir string, buildTags, entryPoints []string, filtered bool, scope string, build func() ([]*model.CallSite, error)) ([]*model.CallSite, error) {
 	key := goDeepCallKey{
+		filtered:    filtered,
+		scope:       scope,
 		dir:         dir,
 		buildTags:   strings.Join(buildTags, ","),
 		entryPoints: strings.Join(entryPoints, ","),

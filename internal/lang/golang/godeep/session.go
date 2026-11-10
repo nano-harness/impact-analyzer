@@ -91,13 +91,21 @@ func (s *Session) CoversDir(dir string) bool {
 // mirroring the standalone BuildPackageCallGraph conversion. It returns an
 // error for directories not covered by the session.
 func (s *Session) CallSitesForDir(dir string, customEntryPoints ...string) ([]*model.CallSite, error) {
+	return s.CallSitesForDirFiltered(dir, nil, customEntryPoints...)
+}
+
+// CallSitesForDirFiltered performs the same complete RTA as CallSitesForDir,
+// but only materializes edges whose call-site filename is accepted by keep.
+// A nil predicate preserves the full result. Declaration locations are not
+// filtered: retained callers can still call functions in dependencies.
+func (s *Session) CallSitesForDirFiltered(dir string, keep func(string) bool, customEntryPoints ...string) ([]*model.CallSite, error) {
 	roots, err := s.rootsForDir(dir, customEntryPoints)
 	if err != nil {
 		return nil, err
 	}
 	if len(roots) == 0 {
-		// rta.Analyze returns nil for empty roots; the standalone path would
-		// hand back an empty (nil) graph as well.
+		// With no roots there are no call sites. The standalone path returns
+		// a non-nil empty graph for graph consumers.
 		return nil, nil
 	}
 	result, err := analyzeRTA(roots)
@@ -107,7 +115,7 @@ func (s *Session) CallSitesForDir(dir string, customEntryPoints ...string) ([]*m
 	if result == nil {
 		return nil, nil
 	}
-	return s.callSites(result.CallGraph), nil
+	return s.callSitesFiltered(result.CallGraph, keep), nil
 }
 
 // FindInterfaceImplementations reuses the session's loaded packages to find
@@ -206,17 +214,22 @@ func (s *Session) closureForDir(dir string, initial []*packages.Package) []*ssa.
 
 // callSites converts RTA call graph edges to call sites, mirroring the
 // conversion in the standalone BuildPackageCallGraph path: only the callee is
-// attached; the caller symbol is computed solely to drop edges whose caller
-// has no package.
+// attached; callers without a source package are excluded without materializing
+// unused caller symbols.
 func (s *Session) callSites(cg *callgraph.Graph) []*model.CallSite {
+	return s.callSitesFiltered(cg, nil)
+}
+
+func (s *Session) callSitesFiltered(cg *callgraph.Graph, keep func(string) bool) []*model.CallSite {
 	var callSites []*model.CallSite
 	for _, node := range cg.Nodes {
 		if node.Func == nil {
 			continue
 		}
 
-		caller := ssaFunctionToSymbol(s.analyzer.Prog, node.Func)
-		if caller == nil {
+		// Only caller eligibility is needed; its source metadata is discarded.
+		caller := SourceFunction(node.Func)
+		if caller == nil || caller.Pkg == nil {
 			continue
 		}
 
@@ -225,13 +238,16 @@ func (s *Session) callSites(cg *callgraph.Graph) []*model.CallSite {
 				continue
 			}
 
+			// Match the consumer using the call site, before allocating symbols.
+			pos := s.analyzer.Prog.Fset.Position(edge.Pos())
+			if keep != nil && !keep(pos.Filename) {
+				continue
+			}
+
 			callee := ssaFunctionToSymbol(s.analyzer.Prog, edge.Callee.Func)
 			if callee == nil {
 				continue
 			}
-
-			// Get position info from the call site
-			pos := s.analyzer.Prog.Fset.Position(edge.Pos())
 
 			callSites = append(callSites, &model.CallSite{
 				File:     pos.Filename,

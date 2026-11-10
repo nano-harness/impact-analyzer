@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-10
+
+### Performance
+
+- **Go call-site conversion**: apply the existing repository call-site filter
+  before allocating dependency symbols, and avoid constructing discarded caller
+  symbols. RTA still analyzes the complete graph, including dependencies, and
+  standalone/shared-session APIs retain their unfiltered default behavior.
+
 ### Fixed
+
+- **Empty RTA results**: standalone Go call graph analysis now returns a valid
+  empty graph when no roots are available, keeping downstream symbol conversion
+  and reachability consumers safe.
 
 - **Go call identity**: register Go declarations before inferring calls so
   sibling-file order cannot change bare-function bindings. Method and free-
