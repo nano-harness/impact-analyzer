@@ -262,6 +262,7 @@ func packageDir(pkg *packages.Package) string {
 // Must set Owner field for consistency with AST-based symbols. Kept in sync
 // with the conversion in the standalone BuildPackageCallGraph path.
 func ssaFunctionToSymbol(prog *ssa.Program, fn *ssa.Function) *model.Symbol {
+	fn = SourceFunction(fn)
 	if fn == nil {
 		return nil
 	}

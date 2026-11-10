@@ -126,20 +126,18 @@ func loadPackageWithCfg(pkgDir string) (prog *ssa.Program, err error) {
 		return nil, fmt.Errorf("errors loading package %s", pkgDir)
 	}
 
-	prog, _ = ssautil.AllPackages(pkgs, ssa.InstantiateGenerics)
-	if prog == nil {
-		return nil, fmt.Errorf("SSA program is nil")
-	}
-
-	// The SSA builder panics on some inputs (notably code type-checked by a
-	// different Go toolchain version than x/tools was built for); recover and
-	// degrade to an error instead of crashing the process.
+	// Recover creation failures on this goroutine. Package builds remain
+	// parallel; panics in x/tools workers cannot be caught by this defer.
 	defer func() {
 		if r := recover(); r != nil {
 			prog = nil
 			err = fmt.Errorf("SSA construction panicked for %s: %v", pkgDir, r)
 		}
 	}()
+	prog, _ = ssautil.AllPackages(pkgs, ssa.InstantiateGenerics)
+	if prog == nil {
+		return nil, fmt.Errorf("SSA program is nil")
+	}
 	prog.Build()
 	return prog, nil
 }

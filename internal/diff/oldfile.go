@@ -24,7 +24,7 @@ func NewOldFileLoader(repoPath, ref string) *OldFileLoader {
 	if ref == "" {
 		return loader
 	}
-	resolved, err := NewGit(repoPath).ResolveRef(ref)
+	resolved, err := NewGit(repoPath).ResolveDiffBase(ref)
 	if err != nil {
 		loader.refErr = err
 		return loader

@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"crypto/sha256"
 	"fmt"
+	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -492,6 +493,23 @@ func (o *Orchestrator) buildCallGraph(files []string) error {
 		_, _ = o.parseCache.ExtractCalls(adapter, filePath)
 	})
 
+	// Register Go declarations for the whole batch before enriching calls.
+	// The cache is already warm, so this does not parse again. A bare call
+	// may name a free function in a later sibling file.
+	for _, file := range files {
+		filePath := o.absolutePath(file)
+		if lang.DetectLanguage(filePath) != model.LanguageGo {
+			continue
+		}
+		fileSymbols, err := o.parseFileSymbols(filePath)
+		if err != nil {
+			continue
+		}
+		for _, sym := range fileSymbols.Symbols {
+			o.callGraph.AddSymbol(sym)
+		}
+	}
+
 	for _, file := range files {
 		filePath := o.absolutePath(file)
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -516,8 +534,10 @@ func (o *Orchestrator) buildCallGraph(files []string) error {
 		// #17-19: Update reverse import index
 		o.reverseImports.AddFileImports(filePath, fileSymbols.Imports)
 
-		for _, sym := range fileSymbols.Symbols {
-			o.callGraph.AddSymbol(sym)
+		if language != model.LanguageGo {
+			for _, sym := range fileSymbols.Symbols {
+				o.callGraph.AddSymbol(sym)
+			}
 		}
 
 		// Extract calls (memoized per run via parseCache; the R3 callee
@@ -545,7 +565,11 @@ func (o *Orchestrator) buildCallGraph(files []string) error {
 				}
 				// Enrich callee package if missing (R3: tree-sitter drops selector operand)
 				if call.Callee.Package == "" && call.Callee.Name != "" {
-					call.Callee.Package = o.inferCalleePackage(call.Callee.Name, fileSymbols)
+					if call.Callee.Language == model.LanguageGo && call.Callee.Owner == "" && call.Callee.Kind != model.SymbolKindMethod {
+						call.Callee.Package = o.inferGoBareCalleePackage(call.Callee.Name, fileSymbols)
+					} else {
+						call.Callee.Package = o.inferCalleePackage(call.Callee.Name, fileSymbols)
+					}
 				}
 				o.callGraph.AddEdge(caller, call.Callee, call.EdgeKind)
 			}
@@ -1574,6 +1598,36 @@ func (o *Orchestrator) uniquePackagesOf(files []string) []string {
 		out = append(out, p)
 	}
 	return out
+}
+
+// inferGoBareCalleePackage resolves an unqualified Go call. Go methods require
+// an explicit receiver; a same-named method or imported function cannot make a
+// local free-function call ambiguous. The current file's declarations are
+// already registered. Repeated index entries are immaterial.
+// Import metadata currently omits aliases and dot-import markers. When there
+// is no local function, retain the existing unique-import heuristic for dot
+// imports, but consider only exported free functions, never methods.
+func (o *Orchestrator) inferGoBareCalleePackage(name string, file *model.FileSymbols) string {
+	var importedPackage string
+	ambiguous := false
+	for _, sym := range o.callGraph.GetSymbolsByName(name) {
+		if sym == nil || sym.Name != name || sym.Owner != "" || sym.Kind != model.SymbolKindFunction {
+			continue
+		}
+		if sym.Package == file.Package {
+			return file.Package
+		}
+		if token.IsExported(name) && packageVisibleFromFile(sym.Package, file) {
+			if importedPackage != "" && importedPackage != sym.Package {
+				ambiguous = true
+			}
+			importedPackage = sym.Package
+		}
+	}
+	if ambiguous {
+		return ""
+	}
+	return importedPackage
 }
 
 // inferCalleePackage tries to resolve the package for a callee with missing package info.

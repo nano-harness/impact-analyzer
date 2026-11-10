@@ -106,3 +106,25 @@ func TestSharedSessionUncoveredDir(t *testing.T) {
 		t.Fatal("expected error for directory outside the session root")
 	}
 }
+
+func TestStandaloneGenericCallSitesUseSourceNames(t *testing.T) {
+	dir := t.TempDir()
+	for name, content := range map[string]string{
+		"go.mod":  "module example.com/genericcalls\n\ngo 1.25\n",
+		"main.go": "package main\nfunc identity[T any](value T) T { return value }\nfunc main() { _ = identity(1) }\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	calls, err := (&GoAdapter{}).BuildPackageCallGraph(dir, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, call := range calls {
+		if call.Callee != nil && call.Callee.Name == "identity" && call.Callee.Package == "example.com/genericcalls" {
+			return
+		}
+	}
+	t.Fatal("standalone conversion dropped the instantiated identity call")
+}

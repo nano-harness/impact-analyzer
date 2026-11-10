@@ -175,3 +175,35 @@ func (g *Git) ResolveRef(ref string) (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
+
+// ResolveDiffBase resolves the old side of a git diff expression. A..B uses
+// A, while A...B uses the merge base of A and B. Git defaults omitted range
+// endpoints to HEAD. rev-parse on a range returns multiple revisions, which
+// cannot be used as a single revision in git show.
+func (g *Git) ResolveDiffBase(ref string) (string, error) {
+	if left, right, ok := strings.Cut(ref, "..."); ok {
+		if left == "" {
+			left = "HEAD"
+		}
+		if right == "" {
+			right = "HEAD"
+		}
+		if strings.HasPrefix(left, "-") || strings.HasPrefix(right, "-") {
+			return "", fmt.Errorf("invalid git diff range %q: refs must not start with '-'", ref)
+		}
+		cmd := exec.Command("git", "merge-base", "--", left, right)
+		cmd.Dir = g.repoPath
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("git merge-base failed: %w", err)
+		}
+		return strings.TrimSpace(string(output)), nil
+	}
+	if left, _, ok := strings.Cut(ref, ".."); ok {
+		if left == "" {
+			left = "HEAD"
+		}
+		return g.ResolveRef(left)
+	}
+	return g.ResolveRef(ref)
+}

@@ -144,6 +144,7 @@ func (s *SSASession) CallEdgesForDir(dir string) ([]model.CallEdge, error) {
 		if fn == nil || node == nil {
 			continue
 		}
+		fn = godeep.SourceFunction(fn)
 		pos := s.analyzer.Prog.Fset.Position(fn.Pos())
 		if pos.Filename == "" {
 			continue
@@ -156,14 +157,15 @@ func (s *SSASession) CallEdgesForDir(dir string) ([]model.CallEdge, error) {
 			if edge.Callee == nil || edge.Callee.Func == nil {
 				continue
 			}
-			calleePos := s.analyzer.Prog.Fset.Position(edge.Callee.Func.Pos())
+			callee := godeep.SourceFunction(edge.Callee.Func)
+			calleePos := s.analyzer.Prog.Fset.Position(callee.Pos())
 			edges = append(edges, model.CallEdge{
 				CallerFile: pos.Filename,
 				CallerLine: pos.Line,
 				CallerName: fn.Name(),
 				CalleeFile: calleePos.Filename,
 				CalleeLine: calleePos.Line,
-				CalleeName: edge.Callee.Func.Name(),
+				CalleeName: callee.Name(),
 			})
 		}
 	}

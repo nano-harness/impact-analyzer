@@ -107,20 +107,16 @@ func (a *Analyzer) BuildSSA() (err error) {
 		return fmt.Errorf("no packages loaded")
 	}
 
-	// Create SSA program
-	a.Prog, a.mains = ssautil.AllPackages(a.pkgs, ssa.InstantiateGenerics)
-
-	// The SSA builder panics on some inputs — notably code type-checked by a
-	// different Go toolchain version than the x/tools this binary was built
-	// with. BuildSSA may run on a background goroutine (shared session
-	// preload), where a panic would kill the whole process; recover and
-	// degrade to an error so callers can fall back to shallower analysis.
+	// Recover creation failures on this goroutine so callers can fall back to
+	// shallower analysis. Package builds remain parallel; panics in x/tools
+	// package-builder workers cannot be caught by this defer.
 	defer func() {
 		if r := recover(); r != nil {
 			a.Prog, a.mains = nil, nil
 			err = fmt.Errorf("SSA construction panicked: %v", r)
 		}
 	}()
+	a.Prog, a.mains = ssautil.AllPackages(a.pkgs, ssa.InstantiateGenerics)
 	a.Prog.Build()
 
 	return nil
@@ -220,6 +216,7 @@ func (a *Analyzer) ConvertToModel(cg *callgraph.Graph) []*model.Symbol {
 
 // functionToSymbol converts an SSA function to our Symbol model
 func (a *Analyzer) functionToSymbol(fn *ssa.Function) *model.Symbol {
+	fn = SourceFunction(fn)
 	if fn == nil {
 		return nil
 	}
@@ -515,6 +512,7 @@ func (a *Analyzer) ReachableFunctionPositions(cg *callgraph.Graph) map[Position]
 	positions := make(map[Position]bool)
 
 	for fn := range cg.Nodes {
+		fn = SourceFunction(fn)
 		if fn == nil {
 			continue
 		}

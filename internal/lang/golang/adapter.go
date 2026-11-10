@@ -606,6 +606,7 @@ func (a *GoAdapter) BuildPackageCallGraph(pkgDir string, buildTags, customEntryP
 // ssaFunctionToSymbol converts an SSA function to our Symbol model (#21)
 // Must set Owner field for consistency with AST-based symbols
 func (a *GoAdapter) ssaFunctionToSymbol(analyzer *godeep.Analyzer, fn *ssa.Function) *model.Symbol {
+	fn = godeep.SourceFunction(fn)
 	if fn == nil {
 		return nil
 	}

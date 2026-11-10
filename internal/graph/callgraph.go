@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"go/token"
 	"log"
 	"os"
 	"sort"
@@ -52,6 +53,11 @@ type CallGraph struct {
 type nameEdge struct {
 	caller      *model.Symbol
 	calleeOwner string
+	// Go has no implicit receiver: an unqualified call cannot name a method.
+	goBareCall bool
+	// A source-backed Go method is known, unlike an AST selector that may
+	// actually address an imported package (including an alias).
+	goMethodCall bool
 }
 
 // NewCallGraph creates a new call graph
@@ -87,6 +93,11 @@ func (cg *CallGraph) AddSymbol(symbol *model.Symbol) {
 	if symbol == nil {
 		return
 	}
+	// A package-enriched call reference is not a declaration. Do not let
+	// its missing source metadata replace an already registered definition.
+	if existing := cg.symbols[symbol.QualifiedName()]; existing != nil && existing.File != "" && symbol.File == "" {
+		return
+	}
 	cg.finalized = false
 	cg.symbols[symbol.QualifiedName()] = symbol
 	cg.symbolsByName[symbol.Name] = append(cg.symbolsByName[symbol.Name], symbol)
@@ -119,11 +130,17 @@ func (cg *CallGraph) AddEdge(caller, callee *model.Symbol, kinds ...model.EdgeKi
 	// callee.Owner, when present, is the call-site receiver hint (best-effort,
 	// variable/field name) and travels with the entry so bare-name lookups can
 	// narrow candidates by owner; see filterCallersByContext.
-	cg.edgesByName[callee.Name] = append(cg.edgesByName[callee.Name], nameEdge{caller: caller, calleeOwner: callee.Owner})
+	entry := nameEdge{
+		caller:       caller,
+		calleeOwner:  callee.Owner,
+		goBareCall:   callee.Language == model.LanguageGo && callee.Owner == "" && callee.Kind != model.SymbolKindMethod,
+		goMethodCall: callee.Language == model.LanguageGo && callee.Kind == model.SymbolKindMethod && callee.Owner != "" && callee.File != "",
+	}
+	cg.edgesByName[callee.Name] = append(cg.edgesByName[callee.Name], entry)
 	if cg.edgesByNameByKind[kind] == nil {
 		cg.edgesByNameByKind[kind] = make(map[string][]nameEdge)
 	}
-	cg.edgesByNameByKind[kind][callee.Name] = append(cg.edgesByNameByKind[kind][callee.Name], nameEdge{caller: caller, calleeOwner: callee.Owner})
+	cg.edgesByNameByKind[kind][callee.Name] = append(cg.edgesByNameByKind[kind][callee.Name], entry)
 	cg.forwardEdges[caller.QualifiedName()] = append(cg.forwardEdges[caller.QualifiedName()], callee)
 	if cg.forwardEdgesByKind[kind] == nil {
 		cg.forwardEdgesByKind[kind] = make(map[string][]*model.Symbol)
@@ -283,6 +300,17 @@ func (cg *CallGraph) resolveCallee(callee, caller *model.Symbol) []*model.Symbol
 		return []*model.Symbol{sym}
 	}
 	candidates := cg.symbolsByName[callee.Name]
+	if callee.Language == model.LanguageGo && callee.Owner == "" && callee.Kind != model.SymbolKindMethod {
+		// Go bare calls cannot resolve to receiver methods. Apply this to
+		// both proximity resolution and the final permissive fallback.
+		compatible := make([]*model.Symbol, 0, len(candidates))
+		for _, candidate := range candidates {
+			if candidate != nil && candidate.Owner == "" && candidate.Kind != model.SymbolKindMethod {
+				compatible = append(compatible, candidate)
+			}
+		}
+		candidates = compatible
+	}
 	if len(candidates) == 0 {
 		return []*model.Symbol{callee}
 	}
@@ -350,6 +378,9 @@ func (cg *CallGraph) filterCallersByContext(entries []nameEdge, target *model.Sy
 	if target.Owner != "" {
 		filtered := make([]*model.Symbol, 0, len(entries))
 		for _, e := range entries {
+			if target.Language == model.LanguageGo && e.goBareCall {
+				continue
+			}
 			caller := e.caller
 			// Same package AND same owner - most precise match
 			if caller.Package == target.Package && caller.Owner == target.Owner {
@@ -396,6 +427,9 @@ func (cg *CallGraph) filterCallersByContext(entries []nameEdge, target *model.Sy
 	// Target has no Owner - use old logic (package + file matching)
 	filtered := make([]*model.Symbol, 0, len(entries))
 	for _, e := range entries {
+		if target.Language == model.LanguageGo && e.goMethodCall {
+			continue
+		}
 		caller := e.caller
 		// Keep if same package (very likely to be correct)
 		if caller.Package == target.Package {
@@ -406,6 +440,13 @@ func (cg *CallGraph) filterCallersByContext(entries []nameEdge, target *model.Sy
 		// Keep if same file (could be same package with different names)
 		if caller.File == target.File {
 			filtered = append(filtered, caller)
+			continue
+		}
+
+		// Importing a Go package cannot make its unexported functions
+		// callable from another package. Name is authoritative here because
+		// synthetic symbols may not populate IsExported.
+		if target.Language == model.LanguageGo && !token.IsExported(target.Name) {
 			continue
 		}
 
@@ -731,6 +772,10 @@ func dedupeAndSortNameEdges(entries []nameEdge) []nameEdge {
 	for _, e := range entries {
 		qname := e.caller.QualifiedName()
 		if idx, ok := seen[qname]; ok {
+			// A caller may use both bare and receiver-qualified calls of this
+			// name. Only exclude it from method fallback when all are bare.
+			result[idx].goBareCall = result[idx].goBareCall && e.goBareCall
+			result[idx].goMethodCall = result[idx].goMethodCall && e.goMethodCall
 			if result[idx].calleeOwner != e.calleeOwner {
 				result[idx].calleeOwner = ""
 			}

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Go call identity**: register Go declarations before inferring calls so
+  sibling-file order cannot change bare-function bindings. Method and free-
+  function fallback now respects known receiver information and Go export
+  visibility, avoiding false cross-package callers for same-named functions.
+- **SSA program creation recovery**: recovery in deep Go analysis and Cobra
+  extraction now also covers program creation. Failed programs are discarded.
+  Package builds remain parallel; panics in x/tools worker goroutines are not
+  covered by this recovery.
+- **Go generic call sites**: instantiated functions and methods are mapped
+  back to their source declarations when producing symbols, call edges and
+  reachability keys. Generic callees with no direct SSA package are no longer
+  silently dropped, and names such as `identity[int]` match source `identity`.
+- **Revision-range old-side loading**: `--diff A...B` now loads old symbols
+  from the merge base, and `A..B` from A, rather than passing a multiline
+  revision list to `git show`, so old declarations remain available when
+  classifying changes that use the documented range syntax.
+
 ## [0.6.0] - 2026-09-13
 
 ### Added
